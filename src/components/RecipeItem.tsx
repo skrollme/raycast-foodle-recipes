@@ -19,9 +19,10 @@ export default function RecipeItem({ recipe }: { recipe: Recipe }) {
       icon={recipe.image}
       accessories={accessories(recipe)}
       actions={
-        <ActionPanel>
+        <ActionPanel title={recipe.name}>
           <ActionPanel.Section>
             <Action.OpenInBrowser url={recipe.url} />
+            <Action.CopyToClipboard content={recipe.url} title="Copy Link" />
           </ActionPanel.Section>
         </ActionPanel>
       }

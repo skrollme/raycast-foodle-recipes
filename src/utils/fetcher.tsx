@@ -1,7 +1,6 @@
-import { Recipe, baseUrlImage, baseUrl, Searchtype } from "./types";
+import { Recipe, baseUrl, Searchtype } from "./types";
 import * as cheerio from "cheerio";
 import { Icon, Image } from "@raycast/api";
-import util from "util";
 import { URLSearchParams } from "node:url";
 import { useFetch } from "@raycast/utils";
 
@@ -40,7 +39,7 @@ export function parseRecipes(html: string): Recipe[] {
 
           if (match) {
             recipe.image = {
-              source: util.format(baseUrlImage, match[1]),
+              source: baseUrl + match[1],
               mask: Image.Mask.RoundedRectangle,
             };
           }
@@ -60,7 +59,7 @@ export function fetchItems(searchtype: Searchtype, searchText: string) {
     q: searchText,
   });
 
-  return useFetch(baseUrl + "?" + searchParams, {
+  return useFetch(baseUrl + "?" + searchParams.toString(), {
     parseResponse(response) {
       return response.text();
     },
