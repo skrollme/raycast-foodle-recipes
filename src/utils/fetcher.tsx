@@ -1,13 +1,12 @@
-import { Recipe, baseUrl, Searchtype } from "./types";
+import { FoodleRecipe, baseUrl, Searchtype } from "./types";
 import * as cheerio from "cheerio";
-import { Icon, Image } from "@raycast/api";
 import { URLSearchParams } from "node:url";
 import { useFetch } from "@raycast/utils";
 
-export function parseRecipes(html: string): Recipe[] {
+export function parseRecipes(html: string): FoodleRecipe[] {
   const $ = cheerio.load(html);
   const results = $("#results");
-  const recipes: Recipe[] = [];
+  const recipes: FoodleRecipe[] = [];
 
   results.find("a").each((_, el) => {
     const href = $(el).attr("href");
@@ -18,10 +17,10 @@ export function parseRecipes(html: string): Recipe[] {
       const recipe = {
         name: name,
         url: href || "",
-        image: Icon.Document,
+        imageUrl: "",
         source: source,
         time: "",
-      } as Recipe;
+      } as FoodleRecipe;
 
       const time = $(el).find("time");
       if (time) {
@@ -38,10 +37,7 @@ export function parseRecipes(html: string): Recipe[] {
           const match = css.match(/background-image:\s*url\(['"]?(.*?)['"]?\)/);
 
           if (match) {
-            recipe.image = {
-              source: baseUrl + match[1],
-              mask: Image.Mask.RoundedRectangle,
-            };
+            recipe.imageUrl = baseUrl + match[1];
           }
         }
       }
@@ -54,16 +50,11 @@ export function parseRecipes(html: string): Recipe[] {
 }
 
 export function fetchItems(searchtype: Searchtype, searchText: string) {
-  const searchParams = new URLSearchParams({
-    f: searchtype,
-    q: searchText,
-  });
-
-  return useFetch(baseUrl + "?" + searchParams.toString(), {
+  return useFetch(baseUrl + "?" + new URLSearchParams({ f: searchtype, q: searchText }).toString(), {
     parseResponse(response) {
       return response.text();
     },
     keepPreviousData: true,
-    initialData: [],
+    initialData: "",
   });
 }

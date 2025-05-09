@@ -2,12 +2,26 @@ import { Image } from "@raycast/api";
 
 export const baseUrl = "https://foodle.recipes/";
 
-export interface Recipe {
+export interface FoodleRecipe {
   name: string;
   url: string;
   source: string;
   time: string;
-  image: Image.ImageLike;
+  imageUrl: string;
+}
+
+export interface JsonLdRecipe {
+  name: string;
+  author: string;
+  prepTime: string;
+  cookTime: string;
+  totalTime: string;
+  recipeYield: string;
+  recipeCategory: string;
+  description: string;
+  image: Image;
+  ingredients: string[] | string;
+  instructions: string[];
 }
 
 export enum Searchtype {

@@ -1,8 +1,9 @@
 import { Action, ActionPanel, Icon, List } from "@raycast/api";
-import { Recipe } from "../utils/types";
+import { FoodleRecipe } from "../utils/types";
+import RecipeDetail from "../components/RecipeDetail";
 
-export default function RecipeItem({ recipe }: { recipe: Recipe }) {
-  function accessories(recipe: Recipe) {
+export default function RecipeItem({ recipe }: { recipe: FoodleRecipe }) {
+  function accessories(recipe: FoodleRecipe) {
     const accessories = [];
     if (recipe.time) {
       accessories.push({ text: recipe.time, icon: Icon.Clock });
@@ -16,11 +17,12 @@ export default function RecipeItem({ recipe }: { recipe: Recipe }) {
       key={recipe.url}
       title={recipe.name}
       subtitle={recipe.source}
-      icon={recipe.image}
+      icon={Icon.Document}
       accessories={accessories(recipe)}
       actions={
         <ActionPanel title={recipe.name}>
           <ActionPanel.Section>
+            <Action.Push icon={Icon.Paragraph} title="Preview" target={<RecipeDetail {...recipe} />} />
             <Action.OpenInBrowser url={recipe.url} />
             <Action.CopyToClipboard content={recipe.url} title="Copy Link" />
           </ActionPanel.Section>
