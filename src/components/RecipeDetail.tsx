@@ -89,31 +89,30 @@ export default function RecipeDetail(recipe: FoodleRecipe) {
   );
 }
 
-function renderRecipe(recipe: FoodleRecipe, extracted: ParsedRecipe | null): [string, ReactNode[]] {
-  const imageUrl = extracted && extracted.image ? extracted.image : recipe.imageUrl;
+function renderRecipe(foodleRecipe: FoodleRecipe, parsedRecipe: ParsedRecipe | null): [string, ReactNode[]] {
+  const imageUrl = parsedRecipe && parsedRecipe.image ? parsedRecipe.image : foodleRecipe.imageUrl;
+  let markdown: string = "# " + foodleRecipe.name + "\n\n![" + foodleRecipe.name + "](" + imageUrl + ")";
 
-  let markdown: string = "# " + recipe.name + "\n\n![" + recipe.name + "](" + imageUrl + ")";
-
-  if (extracted == null) {
+  if (parsedRecipe == null) {
     markdown += "\n\nCould not extract recipe data from the page. Please open the recipe in your browser\n\n";
   } else {
-    if (extracted.description) {
-      markdown += "\n\n## Description\n" + extracted.description + "\n\n";
+    if (parsedRecipe.description) {
+      markdown += "\n\n## Description\n" + parsedRecipe.description + "\n\n";
     }
 
-    if (extracted.ingredients) {
+    if (parsedRecipe.ingredients) {
       markdown = markdown + "## Ingredients\n- ";
-      if (Array.isArray(extracted.ingredients)) {
-        markdown += extracted.ingredients.join("\n- ") + "\n\n";
+      if (Array.isArray(parsedRecipe.ingredients)) {
+        markdown += parsedRecipe.ingredients.join("\n- ") + "\n\n";
       } else {
-        markdown += extracted.ingredients + "\n\n";
+        markdown += parsedRecipe.ingredients + "\n\n";
       }
     }
 
-    if (extracted.instructions) {
+    if (parsedRecipe.instructions) {
       markdown = markdown + "## Instructions\n";
-      if (Array.isArray(extracted.instructions)) {
-        markdown += Object.entries(extracted.instructions)
+      if (Array.isArray(parsedRecipe.instructions)) {
+        markdown += Object.entries(parsedRecipe.instructions)
           .filter(([, howToStep]) => howToStep["@type"] === "HowToStep")
           .map(([, howToStep]) => `- ${howToStep.text}\n`)
           .join("");
@@ -122,34 +121,34 @@ function renderRecipe(recipe: FoodleRecipe, extracted: ParsedRecipe | null): [st
   }
 
   const metadata = [];
-  if (extracted) {
-    if (extracted.author) {
-      metadata.push(<Detail.Metadata.Label key="author" title="Author" text={extracted.author} />);
+  if (parsedRecipe) {
+    if (parsedRecipe.author) {
+      metadata.push(<Detail.Metadata.Label key="author" title="Author" text={parsedRecipe.author} />);
       metadata.push(<Detail.Metadata.Separator key="separator-author" />);
     }
 
     let hasTimeInfo = false;
-    if (extracted.prepTime) {
-      metadata.push(<Detail.Metadata.Label key="prepTime" title="Prep Time" text={extracted.prepTime} />);
+    if (parsedRecipe.prepTime) {
+      metadata.push(<Detail.Metadata.Label key="prepTime" title="Prep Time" text={parsedRecipe.prepTime} />);
       hasTimeInfo = true;
     }
-    if (extracted.cookTime) {
-      metadata.push(<Detail.Metadata.Label key="cookTime" title="Cook Time" text={extracted.cookTime} />);
+    if (parsedRecipe.cookTime) {
+      metadata.push(<Detail.Metadata.Label key="cookTime" title="Cook Time" text={parsedRecipe.cookTime} />);
       hasTimeInfo = true;
     }
-    if (extracted.totalTime) {
-      metadata.push(<Detail.Metadata.Label key="totalTime" title="Total Time" text={extracted.totalTime} />);
+    if (parsedRecipe.totalTime) {
+      metadata.push(<Detail.Metadata.Label key="totalTime" title="Total Time" text={parsedRecipe.totalTime} />);
       hasTimeInfo = true;
     }
     if (hasTimeInfo) {
       metadata.push(<Detail.Metadata.Separator key="separator-timings" />);
     }
 
-    if (extracted.recipeYield) {
-      metadata.push(<Detail.Metadata.Label key="recipeYield" title="Yield" text={extracted.recipeYield} />);
+    if (parsedRecipe.recipeYield) {
+      metadata.push(<Detail.Metadata.Label key="recipeYield" title="Yield" text={parsedRecipe.recipeYield} />);
     }
-    if (extracted.recipeCategory) {
-      metadata.push(<Detail.Metadata.Label key="recipeCategory" title="Category" text={extracted.recipeCategory} />);
+    if (parsedRecipe.recipeCategory) {
+      metadata.push(<Detail.Metadata.Label key="recipeCategory" title="Category" text={parsedRecipe.recipeCategory} />);
     }
   }
 
@@ -183,6 +182,21 @@ function formatISODuration(isoDuration: string | null) {
 
 function mapToJsonLdRecipe(json: Recipe): ParsedRecipe | null {
   if (json["@type"] == "Recipe") {
+    let imageUrl: string | null = null;
+
+    if (Array.isArray(json.image)) {
+      if (typeof json.image[0] == "object") {
+        const image = json.image[0] as LdImage;
+        if (image.url) {
+          imageUrl = image.url;
+        }
+      } else {
+        imageUrl = json.image[0];
+      }
+    } else if (typeof json.image == "string") {
+      imageUrl = json.image;
+    }
+
     return {
       name: json.name || "",
       author: json.author ? (typeof json.author == "object" ? (json.author as LdPerson).name : json.author) : "",
@@ -192,7 +206,7 @@ function mapToJsonLdRecipe(json: Recipe): ParsedRecipe | null {
       recipeYield: json.recipeYield ? json.recipeYield.toString() : "",
       recipeCategory: Array.isArray(json.recipeCategory) ? json.recipeCategory.join(", ") : json.recipeCategory || "",
       description: json.description || "",
-      image: typeof json.image == "object" ? (json.image as LdImage).url : json.image,
+      image: imageUrl,
       ingredients: json.recipeIngredient,
       instructions: json.recipeInstructions,
     } as ParsedRecipe;

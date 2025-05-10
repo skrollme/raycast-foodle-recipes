@@ -19,7 +19,7 @@ export interface ParsedRecipe {
   recipeYield: string;
   recipeCategory: string;
   description: string;
-  image: string;
+  image: string | null;
   ingredients: string[] | string;
   instructions: LdHowToStep[] | string[] | string;
 }
