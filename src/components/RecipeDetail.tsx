@@ -1,9 +1,9 @@
 import { Action, ActionPanel, Detail } from "@raycast/api";
-import { FoodleRecipe, JsonLdRecipe } from "../utils/types";
+import { FoodleRecipe, ParsedRecipe, LdPerson, LdImage } from "../utils/types";
 import * as cheerio from "cheerio";
 import { showFailureToast, useFetch } from "@raycast/utils";
-import { useState } from "react";
-import Label = Detail.Metadata.Label;
+import { ReactNode, useState } from "react";
+import { Recipe } from "schema-dts";
 
 export default function RecipeDetail(recipe: FoodleRecipe) {
   const {
@@ -17,7 +17,7 @@ export default function RecipeDetail(recipe: FoodleRecipe) {
     keepPreviousData: true,
     initialData: "",
   });
-  const [jsonLdRecipe, setJsonLdRecipe] = useState(null as JsonLdRecipe | null);
+  const [jsonLdRecipe, setJsonLdRecipe] = useState(null as ParsedRecipe | null);
 
   if (error) {
     showFailureToast(error);
@@ -36,16 +36,27 @@ export default function RecipeDetail(recipe: FoodleRecipe) {
       if (jsonRaw) {
         const jsonParsed = JSON.parse(jsonRaw);
 
-        let jsonLdRecipe = mapToJsonLdRecipe(jsonParsed);
+        // check for single jsonLd which only contains a recipe
+        let jsonLdRecipe = mapToJsonLdRecipe(jsonParsed as Recipe);
+
         if (jsonLdRecipe != null) {
           setJsonLdRecipe(jsonLdRecipe);
         } else {
+          let ldEntries = [];
+
           if (Array.isArray(jsonParsed)) {
-            for (const entry of jsonParsed) {
-              jsonLdRecipe = mapToJsonLdRecipe(entry);
-              if (jsonLdRecipe != null) {
-                setJsonLdRecipe(jsonLdRecipe);
-              }
+            // jsonLd with an array of jsonLds
+            ldEntries = jsonParsed;
+          } else if (jsonParsed["@graph"] && Array.isArray(jsonParsed["@graph"])) {
+            // jsonLd-graph with an array of jsonLds
+            ldEntries = jsonParsed["@graph"];
+          }
+
+          for (const entry of ldEntries) {
+            // check for each entry if it is a recipe
+            jsonLdRecipe = mapToJsonLdRecipe(entry as Recipe);
+            if (jsonLdRecipe != null) {
+              setJsonLdRecipe(jsonLdRecipe);
             }
           }
         }
@@ -62,7 +73,7 @@ export default function RecipeDetail(recipe: FoodleRecipe) {
       markdown={markdown}
       metadata={
         <Detail.Metadata>
-          {metadata.map((item: Label) => {
+          {metadata.map((item) => {
             return item;
           })}
         </Detail.Metadata>
@@ -78,7 +89,7 @@ export default function RecipeDetail(recipe: FoodleRecipe) {
   );
 }
 
-function renderRecipe(recipe: FoodleRecipe, extracted: JsonLdRecipe | null): [string, Label[]] {
+function renderRecipe(recipe: FoodleRecipe, extracted: ParsedRecipe | null): [string, ReactNode[]] {
   const imageUrl = extracted && extracted.image ? extracted.image : recipe.imageUrl;
 
   let markdown: string = "# " + recipe.name + "\n\n![" + recipe.name + "](" + imageUrl + ")";
@@ -114,7 +125,7 @@ function renderRecipe(recipe: FoodleRecipe, extracted: JsonLdRecipe | null): [st
   if (extracted) {
     if (extracted.author) {
       metadata.push(<Detail.Metadata.Label key="author" title="Author" text={extracted.author} />);
-      metadata.push(<Detail.Metadata.Separator />);
+      metadata.push(<Detail.Metadata.Separator key="separator-author" />);
     }
 
     let hasTimeInfo = false;
@@ -131,7 +142,7 @@ function renderRecipe(recipe: FoodleRecipe, extracted: JsonLdRecipe | null): [st
       hasTimeInfo = true;
     }
     if (hasTimeInfo) {
-      metadata.push(<Detail.Metadata.Separator />);
+      metadata.push(<Detail.Metadata.Separator key="separator-timings" />);
     }
 
     if (extracted.recipeYield) {
@@ -170,30 +181,21 @@ function formatISODuration(isoDuration: string | null) {
   return parts.length > 0 ? parts.join(", ") : null;
 }
 
-function mapToJsonLdRecipe(jsonParsed: object): JsonLdRecipe | null {
-  if (
-    jsonParsed["@type"] == "Recipe" ||
-    (Array.isArray(jsonParsed["@type"]) && jsonParsed["@type"].includes("Recipe"))
-  ) {
+function mapToJsonLdRecipe(json: Recipe): ParsedRecipe | null {
+  if (json["@type"] == "Recipe") {
     return {
-      name: jsonParsed.name || "",
-      author: jsonParsed.author
-        ? typeof jsonParsed.author == "string"
-          ? jsonParsed.author
-          : jsonParsed.author.name
-        : null,
-      prepTime: formatISODuration(jsonParsed.prepTime) || jsonParsed.prepTime,
-      cookTime: formatISODuration(jsonParsed.cookTime) || jsonParsed.cookTime,
-      totalTime: formatISODuration(jsonParsed.totalTime) || jsonParsed.totalTime,
-      recipeYield: jsonParsed.recipeYield ? jsonParsed.recipeYield.toString() : "",
-      recipeCategory: Array.isArray(jsonParsed.recipeCategory)
-        ? jsonParsed.recipeCategory.join(", ")
-        : jsonParsed.recipeCategory || "",
-      description: jsonParsed.description || "",
-      image: typeof jsonParsed.image == "object" ? jsonParsed.image.url : jsonParsed.image,
-      ingredients: jsonParsed.recipeIngredient,
-      instructions: jsonParsed.recipeInstructions,
-    } as JsonLdRecipe;
+      name: json.name || "",
+      author: json.author ? (typeof json.author == "object" ? (json.author as LdPerson).name : json.author) : "",
+      prepTime: formatISODuration(json.prepTime as string) || json.prepTime,
+      cookTime: formatISODuration(json.cookTime as string) || json.cookTime,
+      totalTime: formatISODuration(json.totalTime as string) || json.totalTime,
+      recipeYield: json.recipeYield ? json.recipeYield.toString() : "",
+      recipeCategory: Array.isArray(json.recipeCategory) ? json.recipeCategory.join(", ") : json.recipeCategory || "",
+      description: json.description || "",
+      image: typeof json.image == "object" ? (json.image as LdImage).url : json.image,
+      ingredients: json.recipeIngredient,
+      instructions: json.recipeInstructions,
+    } as ParsedRecipe;
   }
 
   return null;
