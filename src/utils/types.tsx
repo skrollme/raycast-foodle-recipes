@@ -24,7 +24,7 @@ export interface JsonLdRecipe {
   instructions: string[];
 }
 
-export enum Searchtype {
+export enum FoodleSearchtype {
   Title = "t",
   Ingredient = "i",
 }

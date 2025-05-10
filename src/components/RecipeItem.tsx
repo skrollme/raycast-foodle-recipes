@@ -1,6 +1,7 @@
 import { Action, ActionPanel, Icon, List } from "@raycast/api";
 import { FoodleRecipe } from "../utils/types";
 import RecipeDetail from "../components/RecipeDetail";
+import { getFavicon } from "@raycast/utils";
 
 export default function RecipeItem({ recipe }: { recipe: FoodleRecipe }) {
   function accessories(recipe: FoodleRecipe) {
@@ -17,7 +18,7 @@ export default function RecipeItem({ recipe }: { recipe: FoodleRecipe }) {
       key={recipe.url}
       title={recipe.name}
       subtitle={recipe.source}
-      icon={Icon.Document}
+      icon={getFavicon(recipe.url)}
       accessories={accessories(recipe)}
       actions={
         <ActionPanel title={recipe.name}>

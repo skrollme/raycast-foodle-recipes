@@ -31,7 +31,7 @@ export default function RecipeDetail(recipe: FoodleRecipe) {
     const $ = cheerio.load(html);
     const ldEntries = $("script[type='application/ld+json']");
 
-    ldEntries.each((i, element) => {
+    ldEntries.each((_, element) => {
       const jsonRaw = $(element).html();
       if (jsonRaw) {
         const jsonParsed = JSON.parse(jsonRaw);
@@ -78,65 +78,76 @@ export default function RecipeDetail(recipe: FoodleRecipe) {
   );
 }
 
-function renderRecipe(recipe: FoodleRecipe, extracted: JsonLdRecipe | null) {
+function renderRecipe(recipe: FoodleRecipe, extracted: JsonLdRecipe | null): [string, Label[]] {
   const imageUrl = extracted && extracted.image ? extracted.image : recipe.imageUrl;
 
-  let markdown = "# " + recipe.name + "\n\n![" + recipe.name + "](" + imageUrl + ")";
+  let markdown: string = "# " + recipe.name + "\n\n![" + recipe.name + "](" + imageUrl + ")";
 
   if (extracted == null) {
-    markdown = markdown + "\n\nCould not extract recipe data from the page. Please open the rcipe in your browser\n\n";
+    markdown += "\n\nCould not extract recipe data from the page. Please open the recipe in your browser\n\n";
   } else {
     if (extracted.description) {
-      markdown = markdown + "\n\n## Description\n" + extracted.description + "\n\n";
+      markdown += "\n\n## Description\n" + extracted.description + "\n\n";
     }
 
     if (extracted.ingredients) {
       markdown = markdown + "## Ingredients\n- ";
       if (Array.isArray(extracted.ingredients)) {
-        markdown = markdown + extracted.ingredients.join("\n- ") + "\n\n";
+        markdown += extracted.ingredients.join("\n- ") + "\n\n";
       } else {
-        markdown = markdown + extracted.ingredients + "\n\n";
+        markdown += extracted.ingredients + "\n\n";
       }
     }
 
     if (extracted.instructions) {
       markdown = markdown + "## Instructions\n";
       if (Array.isArray(extracted.instructions)) {
-        for (const [, howToStep] of Object.entries(extracted.instructions)) {
-          if (howToStep["@type"] == "HowToStep") {
-            markdown = markdown + "- " + howToStep.text + "\n";
-          }
-        }
+        markdown += Object.entries(extracted.instructions)
+          .filter(([, howToStep]) => howToStep["@type"] === "HowToStep")
+          .map(([, howToStep]) => `- ${howToStep.text}\n`)
+          .join("");
       }
     }
   }
 
   const metadata = [];
   if (extracted) {
-    if (extracted.auther) {
-      metadata.push(<Label key="author" title="Author" text={extracted.author} />);
+    if (extracted.author) {
+      metadata.push(<Detail.Metadata.Label key="author" title="Author" text={extracted.author} />);
+      metadata.push(<Detail.Metadata.Separator />);
     }
+
+    let hasTimeInfo = false;
     if (extracted.prepTime) {
-      metadata.push(<Label key="prepTime" title="Prep Time" text={extracted.prepTime} />);
+      metadata.push(<Detail.Metadata.Label key="prepTime" title="Prep Time" text={extracted.prepTime} />);
+      hasTimeInfo = true;
     }
     if (extracted.cookTime) {
-      metadata.push(<Label key="cookTime" title="Cook Time" text={extracted.cookTime} />);
+      metadata.push(<Detail.Metadata.Label key="cookTime" title="Cook Time" text={extracted.cookTime} />);
+      hasTimeInfo = true;
     }
     if (extracted.totalTime) {
-      metadata.push(<Label key="totalTime" title="Total Time" text={extracted.totalTime} />);
+      metadata.push(<Detail.Metadata.Label key="totalTime" title="Total Time" text={extracted.totalTime} />);
+      hasTimeInfo = true;
     }
+    if (hasTimeInfo) {
+      metadata.push(<Detail.Metadata.Separator />);
+    }
+
     if (extracted.recipeYield) {
-      metadata.push(<Label key="recipeYield" title="Yield" text={extracted.recipeYield.toString()} />);
+      metadata.push(<Detail.Metadata.Label key="recipeYield" title="Yield" text={extracted.recipeYield} />);
     }
     if (extracted.recipeCategory) {
-      metadata.push(<Label key="recipeCategory" title="Category" text={extracted.recipeCategory} />);
+      metadata.push(<Detail.Metadata.Label key="recipeCategory" title="Category" text={extracted.recipeCategory} />);
     }
   }
 
   return [markdown, metadata];
 }
 
-function formatISODuration(isoDuration) {
+function formatISODuration(isoDuration: string | null) {
+  if (!isoDuration) return null;
+
   // Regular expression to parse the ISO 8601 duration
   const regex = /P(?:(\d+)Y)?(?:(\d+)M)?(?:(\d+)W)?(?:(\d+)D)?(?:T(?:(\d+)H)?(?:(\d+)M)?(?:(\d+)S)?)?/;
   const matches = isoDuration.match(regex);
@@ -165,16 +176,20 @@ function mapToJsonLdRecipe(jsonParsed: object): JsonLdRecipe | null {
     (Array.isArray(jsonParsed["@type"]) && jsonParsed["@type"].includes("Recipe"))
   ) {
     return {
-      name: jsonParsed.name,
-      author: jsonParsed.author ? jsonParsed.author.name : "",
+      name: jsonParsed.name || "",
+      author: jsonParsed.author
+        ? typeof jsonParsed.author == "string"
+          ? jsonParsed.author
+          : jsonParsed.author.name
+        : null,
       prepTime: formatISODuration(jsonParsed.prepTime) || jsonParsed.prepTime,
       cookTime: formatISODuration(jsonParsed.cookTime) || jsonParsed.cookTime,
       totalTime: formatISODuration(jsonParsed.totalTime) || jsonParsed.totalTime,
-      recipeYield: jsonParsed.recipeYield,
+      recipeYield: jsonParsed.recipeYield ? jsonParsed.recipeYield.toString() : "",
       recipeCategory: Array.isArray(jsonParsed.recipeCategory)
         ? jsonParsed.recipeCategory.join(", ")
-        : jsonParsed.recipeCategory,
-      description: jsonParsed.description,
+        : jsonParsed.recipeCategory || "",
+      description: jsonParsed.description || "",
       image: typeof jsonParsed.image == "object" ? jsonParsed.image.url : jsonParsed.image,
       ingredients: jsonParsed.recipeIngredient,
       instructions: jsonParsed.recipeInstructions,

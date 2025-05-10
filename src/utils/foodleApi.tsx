@@ -1,18 +1,30 @@
-import { FoodleRecipe, baseUrl, Searchtype } from "./types";
+import { FoodleRecipe, baseUrl, FoodleSearchtype } from "./types";
 import * as cheerio from "cheerio";
 import { URLSearchParams } from "node:url";
 import { useFetch } from "@raycast/utils";
 
-export function parseRecipes(html: string): FoodleRecipe[] {
+export function fetchFoodleHtml(searchtype: FoodleSearchtype, searchText: string) {
+  return useFetch(baseUrl + "?" + new URLSearchParams({ f: searchtype, q: searchText }).toString(), {
+    parseResponse(response) {
+      return response.text();
+    },
+    keepPreviousData: true,
+    initialData: "",
+  });
+}
+
+export function parseFoodleHtmlForRecipes(html: string): FoodleRecipe[] {
   const $ = cheerio.load(html);
   const results = $("#results");
   const recipes: FoodleRecipe[] = [];
 
+  // search result-container for links
   results.find("a").each((_, el) => {
     const href = $(el).attr("href");
     const name = $(el).find("h2").text().trim() || $(el).text().trim();
     const source = $(el).find("cite").text().trim();
 
+    // if a recipe-name was found in a link, treat it as a recipe
     if (name) {
       const recipe = {
         name: name,
@@ -22,6 +34,7 @@ export function parseRecipes(html: string): FoodleRecipe[] {
         time: "",
       } as FoodleRecipe;
 
+      // collect additional / optional data
       const time = $(el).find("time");
       if (time) {
         const timeText = time.text().trim();
@@ -30,6 +43,7 @@ export function parseRecipes(html: string): FoodleRecipe[] {
         }
       }
 
+      // collect image url
       const image = $(el).find('div[class="img"]');
       if (image) {
         const css = image.attr("style");
@@ -47,14 +61,4 @@ export function parseRecipes(html: string): FoodleRecipe[] {
   });
 
   return recipes;
-}
-
-export function fetchItems(searchtype: Searchtype, searchText: string) {
-  return useFetch(baseUrl + "?" + new URLSearchParams({ f: searchtype, q: searchText }).toString(), {
-    parseResponse(response) {
-      return response.text();
-    },
-    keepPreviousData: true,
-    initialData: "",
-  });
 }
